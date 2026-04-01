@@ -1,0 +1,5 @@
+body {
+  background-color: #f1f1f1; /* Fondo gris oscuro */
+  margin: 0; /* Opcional: Buena práctica para quitar márgenes por defecto */
+  font-family: sans-serif; /* Opcional: Unifica la fuente de la app */
+}
