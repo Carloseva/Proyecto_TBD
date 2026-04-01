@@ -5,13 +5,39 @@ const cors = require('cors'); // Para permitir la comunicación
 const multer = require('multer'); // Para manejar archivos
 const path = require('path');
 const fs = require('fs');
+const sql = require('mssql');
 
 const app = express();
 const port = 3000;
 
+const dbConfig = {
+    user: 'db_ac7687_corralondb_admin',
+    password: 'passw0rd#',
+    server: 'sql5111.site4now.net',
+    database: 'db_ac7687_corralondb',
+    options: {
+        encrypt: false,
+        trustServerCertificate: true
+    }
+};
+
+// Intentamos conectar a la BD al iniciar el servidor
+const poolPromise = new sql.ConnectionPool(dbConfig)
+    .connect()
+    .then(pool => {
+        console.log('✅ Conectado a SQL Server en SmarterASP');
+        return pool;
+    })
+    .catch(err => {
+        console.error('❌ Error al conectar a SQL Server:', err);
+        // Si quieres que el servidor no arranque si falla la BD, descomenta la siguiente línea:
+        // process.exit(1); 
+    });
+
+
+// Simulador de BD temporal (Lo iremos reemplazando por SQL en los siguientes commits)
 let vehiculosDB = [];
 
-// Función de ayuda para saber si un timestamp (como nuestro ID) es de hoy
 function esDeHoy(timestamp) {
   const hoy = new Date();
   const fechaTimestamp = new Date(timestamp);
@@ -19,29 +45,22 @@ function esDeHoy(timestamp) {
 }
 
 // --- Middlewares ---
-// se comunica el forntend con el backend y server
 app.use(cors()); 
-// el server.js entiende datos json
 app.use(express.json());
-// el servidor entiende los datos del forms
 app.use(express.urlencoded({ extended: true }));
-// la carpeta uploads es accesible publicamente
 app.use('/uploads', express.static('uploads'));
-
 
 // --- Configuración de Multer para guardar archivos ---
 const uploadDir = 'uploads/';
-// Crea la carpeta 'uploads' si no existe
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadDir); // Le dice a Multer que guarde los archivos en la carpeta 'uploads/'
+    cb(null, uploadDir); 
   },
   filename: function (req, file, cb) {
-    // Crea un nombre de archivo único para evitar sobreescribir imágenes
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
@@ -49,30 +68,26 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-
 // --- Rutas de la API ---
 app.get('/', (req, res) => {
   res.send('¡El servidor del corralón está funcionando y listo para recibir datos!');
 });
 
-// Esta es la nueva ruta que recibirá los datos del formulario
-// 'upload.array('fotos', 10)' significa: "Espera un campo llamado 'fotos' que puede tener hasta 10 archivos"
 app.post('/api/registrar-vehiculo', upload.array('fotos', 10), (req, res) => {
   console.log('--- Datos de texto recibidos ---');
-  console.log(req.body); // Aquí estarán los datos de texto (placa, marca, etc.)
+  console.log(req.body); 
 
   console.log('--- Archivos recibidos ---');
-  console.log(req.files); // Aquí estará la información de las fotos subidas
+  console.log(req.files); 
 
   const nuevoVehiculo = {
-    id: Date.now(), // Un ID único basado en la fecha
+    id: Date.now(), 
     ...req.body,
-    fotos: req.files.map(file => file.path) // Guardamos solo las rutas de las fotos
+    fotos: req.files ? req.files.map(file => file.path) : [] 
   };
   vehiculosDB.push(nuevoVehiculo);
 
-  // Enviamos una respuesta de éxito al frontend
-  res.status(200).json({ message: 'Vehículo registrado exitosamente en el servidor!' });
+  res.status(200).json({ message: 'Vehículo registrado exitosamente en el servidor (Memoria local)!' });
 });
 
 app.get('/api/vehiculos', (req, res) => {
@@ -80,17 +95,10 @@ app.get('/api/vehiculos', (req, res) => {
 });
 
 app.get('/api/stats', (req, res) => {
-  // Usamos .length para saber el total
   const totalVehiculos = vehiculosDB.length;
-
-  // Usamos .filter() y nuestra función de ayuda para contar los de hoy
   const ingresosHoy = vehiculosDB.filter(v => esDeHoy(v.id)).length;
-
-  // Aún no tenemos la lógica para "liberar" un auto,
-  // así que por ahora enviaremos 0.
   const liberadosHoy = 0; 
 
-  // Enviamos los 3 números al frontend
   res.status(200).json({
     totalVehiculos,
     ingresosHoy,
@@ -100,7 +108,6 @@ app.get('/api/stats', (req, res) => {
 
 app.get('/api/vehiculos/:id', (req, res) => {
   const id = req.params.id;
-  // Buscamos en nuestra "base de datos" el vehículo que coincida con el ID
   const vehiculo = vehiculosDB.find(v => v.id.toString() === id);
 
   if (vehiculo) {
@@ -112,5 +119,5 @@ app.get('/api/vehiculos/:id', (req, res) => {
 
 // Iniciar el servidor
 app.listen(port, () => {
-  console.log(`Servidor escuchando en http://localhost:${port}`);
+  console.log(`🚀 Servidor escuchando en http://localhost:${port}`);
 });
