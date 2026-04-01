@@ -90,20 +90,33 @@ app.post('/api/registrar-vehiculo', upload.array('fotos', 10), (req, res) => {
   res.status(200).json({ message: 'Vehículo registrado exitosamente en el servidor (Memoria local)!' });
 });
 
-app.get('/api/vehiculos', (req, res) => {
-  res.status(200).json(vehiculosDB);
-});
+app.get('/api/vehiculos', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT * FROM vehiculos WHERE liberado_el IS NULL ORDER BY fecha_ingreso DESC");
 
-app.get('/api/stats', (req, res) => {
-  const totalVehiculos = vehiculosDB.length;
-  const ingresosHoy = vehiculosDB.filter(v => esDeHoy(v.id)).length;
-  const liberadosHoy = 0; 
+        // ESTO ES LO QUE FALTA:
+        const vehiculos = result.recordset.map(v => {
+            let fotosProcesadas = [];
+            try {
+                // Convertimos el texto "['ruta']" en un Array real de JS
+                fotosProcesadas = JSON.parse(v.fotos || '[]');
+            } catch (err) {
+                console.error("Error parseando fotos del vehículo:", v.id);
+                fotosProcesadas = [];
+            }
 
-  res.status(200).json({
-    totalVehiculos,
-    ingresosHoy,
-    liberadosHoy
-  });
+            return {
+                ...v,
+                fotos: fotosProcesadas
+            };
+        });
+
+        res.status(200).json(vehiculos);
+    } catch (error) { 
+        console.error(error);
+        res.status(500).json({ message: 'Error al obtener vehiculos' });
+    }
 });
 
 app.get('/api/vehiculos/:id', (req, res) => {

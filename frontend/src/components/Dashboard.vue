@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router'; // <-- 1. Importamos el router
 import axios from 'axios';
+import { getImageUrl } from '../utils/formatters';
 
 const router = useRouter(); // <-- 2. Lo inicializamos
 
@@ -76,7 +77,7 @@ function verDetalle(id) {
       >
         <img 
           v-if="vehiculo.fotos && vehiculo.fotos.length > 0" 
-          :src="`http://localhost:3000/${vehiculo.fotos[0]}`" 
+          :src="getImageUrl(vehiculo.fotos[0])" 
           alt="Foto del vehículo" 
           class="card-img"
         >
