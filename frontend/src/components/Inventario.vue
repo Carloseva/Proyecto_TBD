@@ -1,24 +1,65 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
+// Importamos la utilidad que ya tienes en tu carpeta utils
+import { getImageUrl } from '../utils/formatters';
 
 const inventario = ref([]);
 const router = useRouter();
+const terminoBusqueda = ref('');
+const mensajeSistema = ref('');
 
-onMounted(async () => {
+// Carga inicial de datos
+async function cargarInventario() {
   try {
     const response = await axios.get('http://localhost:3000/api/vehiculos');
     inventario.value = response.data.reverse();
   } catch (error) {
     console.error('Error al obtener el inventario:', error);
   }
+}
+
+onMounted(cargarInventario);
+
+// Lógica de búsqueda en tiempo real
+const inventarioFiltrado = computed(() => {
+  if (!terminoBusqueda.value) return inventario.value;
+  const busqueda = terminoBusqueda.value.toLowerCase().trim();
+  return inventario.value.filter(v => 
+    v.placa?.toLowerCase().includes(busqueda) || 
+    v.marca?.toLowerCase().includes(busqueda) ||
+    v.modelo?.toLowerCase().includes(busqueda)
+  );
 });
 
-// Función para formatear la fecha que viene del servidorg
 function formatFecha(timestamp) {
   if (!timestamp) return 'No registrada';
   return new Date(timestamp).toLocaleDateString('es-MX');
+}
+
+async function eliminarVehiculo(id) {
+  if (!confirm('⚠️ ¿Estás seguro de eliminar este vehículo permanentemente?')) return;
+  try {
+    await axios.delete(`http://localhost:3000/api/vehiculos/${id}`);
+    mensajeSistema.value = 'Vehículo eliminado correctamente.';
+    await cargarInventario();
+    setTimeout(() => mensajeSistema.value = '', 3000);
+  } catch (error) {
+    alert('Error al eliminar');
+  }
+}
+
+async function limpiarRegistrosViejos() {
+  if (!confirm('🧹 ¿Eliminar registros liberados hace más de 7 días?')) return;
+  try {
+    const response = await axios.delete('http://localhost:3000/api/maintenance/clean-releases');
+    mensajeSistema.value = response.data.message;
+    await cargarInventario();
+    setTimeout(() => mensajeSistema.value = '', 5000);
+  } catch (error) {
+    alert('Error en mantenimiento');
+  }
 }
 
 function verDetalle(id){
@@ -28,9 +69,28 @@ function verDetalle(id){
 
 <template>
   <div class="inventario-view">
+    
     <div class="header-banner">
-      <h1>🚗 Inventario Actual del Corralón</h1>
-      <p>Aquí puedes ver todos los vehículos actualmente bajo resguardo.</p>
+      <div class="banner-info">
+        <h1>🚗 Inventario Actual</h1>
+        <p>Administración y control de vehículos bajo resguardo.</p>
+      </div>
+      
+      <div class="search-container">
+        <input 
+          v-model="terminoBusqueda" 
+          type="text" 
+          placeholder="Buscar por placa o marca..." 
+          class="search-input"
+        >
+      </div>
+    </div>
+
+    <div class="admin-toolbar">
+        <button @click="limpiarRegistrosViejos" class="btn-maintenance">
+            🧹 Limpiar Liberados Antiguos
+        </button>
+        <span v-if="mensajeSistema" class="mensaje-exito">{{ mensajeSistema }}</span>
     </div>
 
     <table class="inventario-table">
@@ -41,18 +101,20 @@ function verDetalle(id){
           <th>Marca</th>
           <th>Modelo</th>
           <th>Año</th>
-          <th>Fecha de Ingreso</th>
-          
+          <th>Fecha</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
-      <tr v-for="vehiculo in inventario" :key="vehiculo.id" @click="verDetalle(vehiculo.id)">
-        
+        <tr 
+          v-for="vehiculo in inventarioFiltrado" 
+          :key="vehiculo.id" 
+          @click="verDetalle(vehiculo.id)"
+        >
           <td>
             <img 
               v-if="vehiculo.fotos && vehiculo.fotos.length > 0" 
-              :src="`http://localhost:3000/${vehiculo.fotos[0]}`" 
-              alt="Foto del vehículo" 
+              :src="getImageUrl(vehiculo.fotos[0])" 
               class="vehiculo-imagen"
             >
           </td>
@@ -60,83 +122,114 @@ function verDetalle(id){
           <td>{{ vehiculo.marca }}</td>
           <td>{{ vehiculo.modelo }}</td>
           <td>{{ vehiculo.anio }}</td>
-          <td>{{ formatFecha(vehiculo.id) }}</td>
+          <td>{{ formatFecha(vehiculo.fecha_ingreso) }}</td>
+          
+          <td class="acciones-td">
+            <button 
+                class="btn-trash" 
+                @click.stop="eliminarVehiculo(vehiculo.id)"
+                title="Eliminar permanentemente"
+            >
+                🗑️
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>
 
-    <p v-if="inventario.length === 0" class="empty-message">No hay vehículos registrados en el inventario.</p>
+    <p v-if="inventarioFiltrado.length === 0" class="empty-message">
+      No se encontraron vehículos.
+    </p>
   </div>
 </template>
 
 <style scoped>
-.inventario-view {
-  animation: fadeIn 0.5s ease-in-out;
-}
+.inventario-view { animation: fadeIn 0.5s ease-in-out; }
 
-/* --- Estilos para el nuevo banner --- */
 .header-banner {
-  background: linear-gradient(to right, #34495e, #2c3e50);
+  background: linear-gradient(to right, #2c3e50, #0a0e12);
   color: white;
   padding: 1.5rem 2rem;
   border-radius: 8px;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.header-banner h1 {
-  margin: 0;
-  font-size: 1.8rem;
+.search-input {
+  padding: 0.6rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.1);
+  color: white;
+  width: 250px;
 }
 
-.header-banner p {
-  margin: 0.5rem 0 0;
-  opacity: 0.9;
+.search-input::placeholder { color: rgba(255,255,255,0.5); }
+
+.admin-toolbar {
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
-/* --- Estilos para la tabla y la imagen --- */
+.btn-maintenance {
+    background: linear-gradient(to right, #f0620b, #e1ae14);
+    color: white; border: none;
+    padding: 0.6rem 1rem; border-radius: 6px;
+    cursor: pointer; font-weight: bold;
+    transition: transform 0.2s;
+}
+.btn-maintenance:hover { transform: scale(1.02); }
+
 .inventario-table {
   width: 100%;
   border-collapse: collapse;
-  background-color: #fff;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  background: linear-gradient(to right, #2c3e50, #0a0e12);
   border-radius: 8px;
-  overflow: hidden; /* Para que los bordes redondeados se apliquen a la tabla */
+  overflow: hidden;
 }
 
 th, td {
   padding: 1rem;
   text-align: left;
-  border-bottom: 1px solid #ddd;
-  vertical-align: middle; /* Centra el contenido verticalmente */
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  color: white;
 }
 
-thead {
-  background-color: #f8f9fa;
-}
+thead { background: linear-gradient(to right, #2c3e50, #01655c, #2c3e50); }
 
-th {
-  font-weight: 600;
-}
-
-tbody tr:hover {
-  background-color: #f1f1f1;
-  cursor: pointer;
+tbody tr:hover { 
+  background: rgba(1, 101, 92, 0.4); 
+  cursor: pointer; 
 }
 
 .vehiculo-imagen {
-  width: 100px;
-  height: 60px;
-  object-fit: cover; /* Asegura que la imagen no se deforme */
+  width: 120px;
+  height: 80px;
+  object-fit: cover;
   border-radius: 6px;
 }
 
-.empty-message {
-  text-align: center;
-  margin-top: 2rem;
-  font-size: 1.1rem;
-  color: #777;
+.btn-trash {
+    background-color: transparent;
+    border: 1px solid #e74c3c;
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 5px 10px;
+    font-size: 1.1rem;
 }
+
+tbody tr:has(.btn-trash:hover) {
+  background: linear-gradient(to right, #5c1818, #c0392b) !important;
+}
+
+.mensaje-exito { color: #27ae60; font-weight: bold; }
+
+.empty-message { text-align: center; margin-top: 2rem; color: #bdc3c7; }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10px); }
