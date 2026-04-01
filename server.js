@@ -73,21 +73,29 @@ app.get('/', (req, res) => {
   res.send('¡El servidor del corralón está funcionando y listo para recibir datos!');
 });
 
-app.post('/api/registrar-vehiculo', upload.array('fotos', 10), (req, res) => {
-  console.log('--- Datos de texto recibidos ---');
-  console.log(req.body); 
+app.post('/api/registrar-vehiculo', upload.array('fotos'), async (req, res) => {
+    try {
+        const { placa, marca, modelo, anio, color, titulo, motivo } = req.body;
+        const fotosPaths = req.files.map(f => f.path); // Guardamos la ruta tal cual
+        
+        const pool = await poolPromise;
+        await pool.request()
+            .input('placa', sql.VarChar, placa)
+            .input('marca', sql.VarChar, marca)
+            .input('modelo', sql.VarChar, modelo)
+            .input('anio', sql.Int, anio)
+            .input('color', sql.VarChar, color)
+            .input('titulo', sql.VarChar, titulo)
+            .input('motivo', sql.Text, motivo)
+            .input('fotos', sql.Text, JSON.stringify(fotosPaths))
+            .input('estatus', sql.VarChar, 'Sin especificar')
+            .query(`INSERT INTO vehiculos (placa, marca, modelo, anio, color, titulo, motivo, fotos, estatus, fecha_ingreso) 
+                    VALUES (@placa, @marca, @modelo, @anio, @color, @titulo, @motivo, @fotos, @estatus, GETDATE())`);
 
-  console.log('--- Archivos recibidos ---');
-  console.log(req.files); 
-
-  const nuevoVehiculo = {
-    id: Date.now(), 
-    ...req.body,
-    fotos: req.files ? req.files.map(file => file.path) : [] 
-  };
-  vehiculosDB.push(nuevoVehiculo);
-
-  res.status(200).json({ message: 'Vehículo registrado exitosamente en el servidor (Memoria local)!' });
+        res.json({ success: true, message: "Vehículo registrado (Beta)" });
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
 app.get('/api/vehiculos', async (req, res) => {
