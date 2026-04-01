@@ -93,24 +93,13 @@ app.post('/api/registrar-vehiculo', upload.array('fotos', 10), (req, res) => {
 app.get('/api/vehiculos', async (req, res) => {
     try {
         const pool = await poolPromise;
+        // Traemos todos los que no estén liberados
         const result = await pool.request().query("SELECT * FROM vehiculos WHERE liberado_el IS NULL ORDER BY fecha_ingreso DESC");
 
-        // ESTO ES LO QUE FALTA:
-        const vehiculos = result.recordset.map(v => {
-            let fotosProcesadas = [];
-            try {
-                // Convertimos el texto "['ruta']" en un Array real de JS
-                fotosProcesadas = JSON.parse(v.fotos || '[]');
-            } catch (err) {
-                console.error("Error parseando fotos del vehículo:", v.id);
-                fotosProcesadas = [];
-            }
-
-            return {
-                ...v,
-                fotos: fotosProcesadas
-            };
-        });
+        const vehiculos = result.recordset.map(v => ({
+            ...v,
+            fotos: JSON.parse(v.fotos || '[]') // Convertimos el texto en Array
+        }));
 
         res.status(200).json(vehiculos);
     } catch (error) { 
@@ -119,18 +108,50 @@ app.get('/api/vehiculos', async (req, res) => {
     }
 });
 
-app.get('/api/vehiculos/:id', (req, res) => {
-  const id = req.params.id;
-  const vehiculo = vehiculosDB.find(v => v.id.toString() === id);
+app.get('/api/stats', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        
+        // Consultas para las tarjetas del Dashboard
+        const total = await pool.request().query("SELECT COUNT(*) as total FROM vehiculos WHERE liberado_el IS NULL");
+        const liberados = await pool.request().query("SELECT COUNT(*) as total FROM vehiculos WHERE CAST(liberado_el AS DATE) = CAST(GETDATE() AS DATE)");
+        const hoy = await pool.request().query("SELECT COUNT(*) as total FROM vehiculos WHERE CAST(fecha_ingreso AS DATE) = CAST(GETDATE() AS DATE) AND liberado_el IS NULL");
 
-  if (vehiculo) {
-    res.status(200).json(vehiculo);
-  } else {
-    res.status(404).json({ message: 'Vehículo no encontrado' });
-  }
+        res.status(200).json({
+            totalVehiculos: total.recordset[0].total,
+            ingresosHoy: hoy.recordset[0].total,
+            liberadosHoy: liberados.recordset[0].total
+        });
+    } catch (error) { 
+        console.error(error);
+        res.status(500).json({ message: 'Error en las estadísticas' });
+    }
 });
 
-// Iniciar el servidor
-app.listen(port, () => {
-  console.log(`🚀 Servidor escuchando en http://localhost:${port}`);
+app.get('/api/vehiculos/:id', async (req, res) => {
+    try {
+        const id = req.params.id; // Obtenemos el ID de la URL
+        const pool = await poolPromise;
+        
+        // Buscamos solo el vehículo que coincida con ese ID
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query("SELECT * FROM vehiculos WHERE id = @id");
+
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ message: 'Vehículo no encontrado' });
+        }
+
+        // Preparamos el objeto para enviarlo al Frontend
+        const vehiculo = {
+            ...result.recordset[0],
+            // IMPORTANTE: Convertimos el texto de las fotos en un Array real
+            fotos: JSON.parse(result.recordset[0].fotos || '[]')
+        };
+        
+        res.status(200).json(vehiculo);
+    } catch (error) {
+        console.error("Error al obtener detalle:", error);
+        res.status(500).json({ message: 'Error en el servidor' });
+    }
 });
