@@ -35,7 +35,6 @@ const poolPromise = new sql.ConnectionPool(dbConfig)
     });
 
 
-// Simulador de BD temporal (Lo iremos reemplazando por SQL en los siguientes commits)
 let vehiculosDB = [];
 
 function esDeHoy(timestamp) {
@@ -161,5 +160,14 @@ app.get('/api/vehiculos/:id', async (req, res) => {
     } catch (error) {
         console.error("Error al obtener detalle:", error);
         res.status(500).json({ message: 'Error en el servidor' });
+    }
+});
+
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+    if (username === 'admin' && password === '123') {
+        res.json({ success: true, message: "Bienvenido" });
+    } else {
+        res.status(401).json({ success: false, message: "Credenciales inválidas" });
     }
 });

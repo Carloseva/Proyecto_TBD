@@ -1,23 +1,37 @@
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const esAdmin = ref(false);
+
+onMounted(() => {
+  // Verificamos el localStorage al cargar el componente
+  esAdmin.value = localStorage.getItem('esAdmin') === 'true';
+});
+
+function cerrarSesion() {
+  localStorage.removeItem('esAdmin');
+  window.location.href = '/login'; // Forzamos recarga para limpiar el estado
+}
+</script>
+
 <template>
   <aside class="sidebar">
     <h3>Corralink</h3>
-    <nav class="navigation-menu">
-      <router-link to="/" class="nav-link">
-        <span class="icon">📊</span> Dashboard
-      </router-link>
-      <router-link to="/registrar" class="nav-link">
-        <span class="icon">➕</span> Registrar Vehículo
-      </router-link>
-      <router-link to="/inventario" class="nav-link">
-        <span class="icon">🚗</span> Inventario Actual
-      </router-link>
-      <router-link to="/buscar" class="nav-link">
-      <span class="icon">👁️‍🗨️</span> Buscar
-      </router-link>
-      <router-link to="/" class="nav-link">
-        <span class="icon">🥱</span> Mi Vehiculo
-      </router-link>
+    <nav>
+      <router-link to="/">📊 Dashboard</router-link>
+      <router-link to="/buscar">👁️‍🗨️ Buscar</router-link>
+
+      <div v-if="esAdmin">
+        <div class="divider">Admin</div>
+        <router-link to="/registrar">➕ Registrar</router-link>
+        <router-link to="/inventario">🚗 Inventario</router-link>
+      </div>
     </nav>
+
+    <div class="bottom">
+      <router-link v-if="!esAdmin" to="/login">🔐 Iniciar Sesión</router-link>
+      <button v-else @click="cerrarSesion">🚪 Salir</button>
+    </div>
   </aside>
 </template>
 
