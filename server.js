@@ -57,15 +57,15 @@ if (!fs.existsSync(uploadDir)) {
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadDir); 
+    cb(null, 'uploads/') // Asegúrate de que la carpeta exista
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // Esto crea un nombre como: 1712123456789-auto.jpg
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, uniqueSuffix + '-' + file.originalname)
   }
-});
-
-const upload = multer({ storage: storage });
+})
+const upload = multer({ storage: storage })
 
 // --- Rutas de la API ---
 app.get('/', (req, res) => {
@@ -116,23 +116,18 @@ app.get('/api/vehiculos', async (req, res) => {
 });
 
 app.get('/api/stats', async (req, res) => {
-    try {
-        const pool = await poolPromise;
-        
-        // Consultas para las tarjetas del Dashboard
-        const total = await pool.request().query("SELECT COUNT(*) as total FROM vehiculos WHERE liberado_el IS NULL");
-        const liberados = await pool.request().query("SELECT COUNT(*) as total FROM vehiculos WHERE CAST(liberado_el AS DATE) = CAST(GETDATE() AS DATE)");
-        const hoy = await pool.request().query("SELECT COUNT(*) as total FROM vehiculos WHERE CAST(fecha_ingreso AS DATE) = CAST(GETDATE() AS DATE) AND liberado_el IS NULL");
-
-        res.status(200).json({
-            totalVehiculos: total.recordset[0].total,
-            ingresosHoy: hoy.recordset[0].total,
-            liberadosHoy: liberados.recordset[0].total
-        });
-    } catch (error) { 
-        console.error(error);
-        res.status(500).json({ message: 'Error en las estadísticas' });
-    }
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT 
+        (SELECT COUNT(*) FROM vehiculos) as total,
+        (SELECT COUNT(*) FROM vehiculos WHERE CAST(fecha_ingreso AS DATE) = CAST(GETDATE() AS DATE)) as hoy,
+        (SELECT COUNT(*) FROM vehiculos WHERE estatus = 'Liberado') as liberados
+    `);
+    res.json(result.recordset[0]);
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
 });
 
 app.get('/api/vehiculos/:id', async (req, res) => {
