@@ -7,28 +7,21 @@ import { getImageUrl } from '../utils/formatters';
 const router = useRouter(); // <-- 2. Lo inicializamos
 
 // Guardará las estadísticas
-const stats = ref({
-  totalVehiculos: 0,
-  ingresosHoy: 0,
-  liberadosHoy: 0
-});
+const stats = ref({});
 
 // Guardará la lista de vehículos
 const inventario = ref([]); // <-- 3. Creamos el ref para el inventario
 
 onMounted(async () => {
   try {
-    // Pedimos ambas cosas al mismo tiempo
-    const [statsRes, inventarioRes] = await Promise.all([
-      axios.get('http://localhost:3000/api/stats'),
-      axios.get('http://localhost:3000/api/vehiculos')
+    const [invRes, statsRes] = await Promise.all([
+      axios.get('http://localhost:3000/api/vehiculos'),
+      axios.get('http://localhost:3000/api/stats')
     ]);
-    
+    inventario.value = invRes.data.reverse().slice(0, 6); // Solo los últimos 6
     stats.value = statsRes.data;
-    inventario.value = Array.isArray(inventarioRes.data) ? inventarioRes.data.reverse() : [];
-
   } catch (error) {
-    console.error('Error al cargar los datos del dashboard:', error);
+    console.error('Error al cargar datos del dashboard', error);
   }
 });
 
@@ -40,28 +33,54 @@ function verDetalle(id) {
 
 <template>
   <div class="dashboard-view">
-    
-    <div class="header-banner">
-      <h1>Dashboard: Mi Corralón</h1>
-      <p>Resumen de la operación del día.</p>
-    </div>
-    
-    <div class="stats-container">
-    <div class="stat-card">
-      <h2>{{ stats.totalVehiculos }}</h2>
-      <p>Vehículos en Corralón</p>
-    </div>
-
-    <div class="stat-card green">
-      <h2>{{ stats.ingresosHoy }}</h2>
-      <p>Ingresos de Hoy</p>
+    <div class="stats-banner">
+      <div class="stat-card green">
+        <h3>{{ stats.total || 0 }}</h3>
+        <p>Total en Resguardo</p>
+      </div>
+      <div class="stat-card blue">
+        <h3>{{ stats.hoy || 0 }}</h3>
+        <p>Ingresos de Hoy</p>
+      </div>
+      <div class="stat-card orange">
+        <h3>{{ stats.liberados || 0 }}</h3>
+        <p>Vehículos Liberados</p>
+      </div>
     </div>
 
-    <div class="stat-card red">
-      <h2>{{ stats.liberadosHoy }}</h2>
-      <p>Liberados Hoy (Próximamente)</p>
+    <div class="section-title">
+      <h2>🚗 Unidades Recientes</h2>
+      <hr>
     </div>
-</div>
+
+    <div class="vehiculo-grid">
+      <div 
+        v-for="vehiculo in inventario" 
+        :key="vehiculo.id" 
+        class="vehiculo-card" 
+        @click="verDetalle(vehiculo.id)"
+      >
+        <div class="card-image-container">
+          <img 
+            v-if="vehiculo.fotos && vehiculo.fotos.length > 0" 
+            :src="getImageUrl(vehiculo.fotos[0])" 
+            class="card-img"
+          >
+          <div v-else class="card-img-placeholder">
+            <span>🚗</span>
+            <p>Sin Foto</p>
+          </div>
+        </div>
+        
+        <div class="card-info">
+          <h4>{{ vehiculo.marca }} {{ vehiculo.modelo }}</h4>
+          <span class="placa-badge">{{ vehiculo.placa }}</span>
+          <p class="fecha-card">{{ formatFecha(vehiculo.fecha_ingreso) }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
     <div class="gallery-header">
       <h2>Recién Llegados al Corralón</h2>
