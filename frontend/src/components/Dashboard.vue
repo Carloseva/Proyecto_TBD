@@ -78,7 +78,7 @@ function verDetalle(id) {
         <img 
           v-if="vehiculo.fotos && vehiculo.fotos.length > 0" 
           :src="getImageUrl(vehiculo.fotos[0])" 
-          alt="Foto del vehículo" 
+          alt="Vehículo"
           class="card-img"
         >
         <div v-else class="card-img-placeholder">
