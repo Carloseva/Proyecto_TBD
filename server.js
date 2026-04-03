@@ -9,18 +9,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. CONFIGURACIÓN DE CARPETA ESTÁTICA
-// Esto permite que el navegador vea las fotos en http://localhost:3000/uploads/...
+// 1. GESTIÓN DE ARCHIVOS ESTÁTICOS
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
 }
 app.use('/uploads', express.static(uploadDir));
 
-// 2. CONFIGURACIÓN DE SQL SERVER
+// 2. CONFIGURACIÓN DE BASE DE DATOS (SQL SERVER)
 const dbConfig = {
-    user: 'sa', // Tu usuario de SQL
-    password: 'tu_password', // Tu contraseña
+    user: 'sa', 
+    password: 'tu_password', 
     server: 'localhost',
     database: 'CorralinkDB',
     options: {
@@ -32,42 +31,39 @@ const dbConfig = {
 const poolPromise = new sql.ConnectionPool(dbConfig)
     .connect()
     .then(pool => {
-        console.log('✅ Conectado a SQL Server (CorralinkDB)');
+        console.log('✅ Conexión exitosa a SQL Server');
         return pool;
     })
-    .catch(err => console.log('❌ Error de conexión a la base de datos: ', err));
+    .catch(err => console.log('❌ Error de conexión SQL: ', err));
 
-// 3. CONFIGURACIÓN DE MULTER (GESTIÓN DE IMÁGENES)
+// 3. CONFIGURACIÓN DE SUBIDA DE IMÁGENES (MULTER)
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'uploads/'),
     filename: (req, file, cb) => {
-        // Nombre único profesional: timestamp-random-nombre.ext
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, uniqueSuffix + '-' + file.originalname.replace(/\s/g, '_'));
     }
 });
 const upload = multer({ storage: storage });
 
-// --- RUTAS DE LA API ---
+// --- ENDPOINTS DE LA API ---
 
-// A) Obtener todos los vehículos
+// OBTENER TODOS LOS VEHÍCULOS
 app.get('/api/vehiculos', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query('SELECT * FROM vehiculos');
-        
-        // Parsear el JSON de fotos de cada vehículo antes de enviarlo al frontend
         const vehiculos = result.recordset.map(v => ({
             ...v,
             fotos: v.fotos ? JSON.parse(v.fotos) : []
         }));
         res.json(vehiculos);
     } catch (err) {
-        res.status(500).send(err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
-// B) Obtener estadísticas para el Dashboard
+// ESTADÍSTICAS PARA EL DASHBOARD
 app.get('/api/stats', async (req, res) => {
     try {
         const pool = await poolPromise;
@@ -79,17 +75,29 @@ app.get('/api/stats', async (req, res) => {
         `);
         res.json(result.recordset[0]);
     } catch (err) {
-        res.status(500).send(err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
-// C) Registrar nuevo vehículo (Soporta hasta 20 fotos)
+// REGISTRO CON VALIDACIÓN DE DUPLICADOS (Lógica pesada)
 app.post('/api/registrar-vehiculo', upload.array('fotos', 20), async (req, res) => {
     try {
         const { placa, marca, modelo, anio, color, titulo, motivo, estatus } = req.body;
-        const fotosPaths = req.files.map(file => file.path); // Guardamos la ruta del archivo
-
         const pool = await poolPromise;
+
+        // Validar si la placa ya existe y no ha sido liberada
+        const check = await pool.request()
+            .input('p', sql.VarChar, placa)
+            .query('SELECT id FROM vehiculos WHERE placa = @p AND estatus != "Liberado"');
+
+        if (check.recordset.length > 0) {
+            // Si hay fotos subidas por Multer, las borramos para no dejar basura si falla el registro
+            req.files.forEach(f => fs.unlinkSync(f.path));
+            return res.status(409).json({ message: 'Error: El vehículo con esta placa ya tiene un registro activo.' });
+        }
+
+        const fotosPaths = req.files.map(file => file.path);
+
         await pool.request()
             .input('placa', sql.VarChar, placa)
             .input('marca', sql.VarChar, marca)
@@ -103,39 +111,34 @@ app.post('/api/registrar-vehiculo', upload.array('fotos', 20), async (req, res) 
             .query(`INSERT INTO vehiculos (placa, marca, modelo, anio, color, titulo, motivo, fotos, estatus, fecha_ingreso) 
                     VALUES (@placa, @marca, @modelo, @anio, @color, @titulo, @motivo, @fotos, @estatus, GETDATE())`);
 
-        res.json({ success: true, message: 'Vehículo registrado correctamente' });
+        res.status(201).json({ success: true, message: 'Vehículo registrado sin duplicados.' });
     } catch (err) {
-        res.status(500).send(err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
-// D) Eliminar vehículo (Registro + Fotos físicas)
+// ELIMINAR VEHÍCULO Y SUS FOTOS FÍSICAS
 app.delete('/api/vehiculos/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const pool = await poolPromise;
 
-        // 1. Buscamos las fotos para borrarlas del disco duro
         const vehiculo = await pool.request().input('id', sql.Int, id)
             .query('SELECT fotos FROM vehiculos WHERE id = @id');
 
-        if (vehiculo.recordset[0] && vehiculo.recordset[0].fotos) {
+        if (vehiculo.recordset[0]?.fotos) {
             const fotos = JSON.parse(vehiculo.recordset[0].fotos);
-            fotos.forEach(fotoPath => {
-                if (fs.existsSync(fotoPath)) fs.unlinkSync(fotoPath);
-            });
+            fotos.forEach(path => { if (fs.existsSync(path)) fs.unlinkSync(path); });
         }
 
-        // 2. Borramos de la base de datos
         await pool.request().input('id', sql.Int, id).query('DELETE FROM vehiculos WHERE id = @id');
-        
-        res.json({ success: true, message: 'Vehículo y archivos eliminados' });
+        res.json({ success: true, message: 'Registro y archivos eliminados.' });
     } catch (err) {
-        res.status(500).send(err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
 const PORT = 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor Corralink corriendo en http://localhost:${PORT}`);
+    console.log(`🚀 Servidor activo en puerto ${PORT}`);
 });
