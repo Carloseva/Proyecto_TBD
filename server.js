@@ -1,82 +1,94 @@
-// server.js
-
 const express = require('express');
-const cors = require('cors'); // Para permitir la comunicación
-const multer = require('multer'); // Para manejar archivos
-const path = require('path');
-const fs = require('fs');
 const sql = require('mssql');
+const multer = require('multer');
+const path = require('path');
+const cors = require('cors');
+const fs = require('fs');
 
 const app = express();
-const port = 3000;
+app.use(cors());
+app.use(express.json());
 
+// 1. CONFIGURACIÓN DE CARPETA ESTÁTICA
+// Esto permite que el navegador vea las fotos en http://localhost:3000/uploads/...
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir);
+}
+app.use('/uploads', express.static(uploadDir));
+
+// 2. CONFIGURACIÓN DE SQL SERVER
 const dbConfig = {
-    user: 'db_ac7687_corralondb_admin',
-    password: 'passw0rd#',
-    server: 'sql5111.site4now.net',
-    database: 'db_ac7687_corralondb',
+    user: 'sa', // Tu usuario de SQL
+    password: 'tu_password', // Tu contraseña
+    server: 'localhost',
+    database: 'CorralinkDB',
     options: {
         encrypt: false,
         trustServerCertificate: true
     }
 };
 
-// Intentamos conectar a la BD al iniciar el servidor
 const poolPromise = new sql.ConnectionPool(dbConfig)
     .connect()
     .then(pool => {
-        console.log('✅ Conectado a SQL Server en SmarterASP');
+        console.log('✅ Conectado a SQL Server (CorralinkDB)');
         return pool;
     })
-    .catch(err => {
-        console.error('❌ Error al conectar a SQL Server:', err);
-        // Si quieres que el servidor no arranque si falla la BD, descomenta la siguiente línea:
-        // process.exit(1); 
-    });
+    .catch(err => console.log('❌ Error de conexión a la base de datos: ', err));
 
-
-let vehiculosDB = [];
-
-function esDeHoy(timestamp) {
-  const hoy = new Date();
-  const fechaTimestamp = new Date(timestamp);
-  return fechaTimestamp.setHours(0, 0, 0, 0) === hoy.setHours(0, 0, 0, 0);
-}
-
-// --- Middlewares ---
-app.use(cors()); 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// --- Configuración de Multer para guardar archivos ---
-const uploadDir = 'uploads/';
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
-}
-
+// 3. CONFIGURACIÓN DE MULTER (GESTIÓN DE IMÁGENES)
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/') // Asegúrate de que la carpeta exista
-  },
-  filename: function (req, file, cb) {
-    // Esto crea un nombre como: 1712123456789-auto.jpg
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
-    cb(null, uniqueSuffix + '-' + file.originalname)
-  }
-})
-const upload = multer({ storage: storage })
+    destination: (req, file, cb) => cb(null, 'uploads/'),
+    filename: (req, file, cb) => {
+        // Nombre único profesional: timestamp-random-nombre.ext
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname.replace(/\s/g, '_'));
+    }
+});
+const upload = multer({ storage: storage });
 
-// --- Rutas de la API ---
-app.get('/', (req, res) => {
-  res.send('¡El servidor del corralón está funcionando y listo para recibir datos!');
+// --- RUTAS DE LA API ---
+
+// A) Obtener todos los vehículos
+app.get('/api/vehiculos', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM vehiculos');
+        
+        // Parsear el JSON de fotos de cada vehículo antes de enviarlo al frontend
+        const vehiculos = result.recordset.map(v => ({
+            ...v,
+            fotos: v.fotos ? JSON.parse(v.fotos) : []
+        }));
+        res.json(vehiculos);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
 });
 
-app.post('/api/registrar-vehiculo', upload.array('fotos'), async (req, res) => {
+// B) Obtener estadísticas para el Dashboard
+app.get('/api/stats', async (req, res) => {
     try {
-        const { placa, marca, modelo, anio, color, titulo, motivo } = req.body;
-        const fotosPaths = req.files.map(f => f.path); // Guardamos la ruta tal cual
-        
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT 
+                (SELECT COUNT(*) FROM vehiculos) as total,
+                (SELECT COUNT(*) FROM vehiculos WHERE CAST(fecha_ingreso AS DATE) = CAST(GETDATE() AS DATE)) as hoy,
+                (SELECT COUNT(*) FROM vehiculos WHERE estatus = 'Liberado') as liberados
+        `);
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
+
+// C) Registrar nuevo vehículo (Soporta hasta 20 fotos)
+app.post('/api/registrar-vehiculo', upload.array('fotos', 20), async (req, res) => {
+    try {
+        const { placa, marca, modelo, anio, color, titulo, motivo, estatus } = req.body;
+        const fotosPaths = req.files.map(file => file.path); // Guardamos la ruta del archivo
+
         const pool = await poolPromise;
         await pool.request()
             .input('placa', sql.VarChar, placa)
@@ -87,82 +99,43 @@ app.post('/api/registrar-vehiculo', upload.array('fotos'), async (req, res) => {
             .input('titulo', sql.VarChar, titulo)
             .input('motivo', sql.Text, motivo)
             .input('fotos', sql.Text, JSON.stringify(fotosPaths))
-            .input('estatus', sql.VarChar, 'Sin especificar')
+            .input('estatus', sql.VarChar, estatus || 'Ingresado')
             .query(`INSERT INTO vehiculos (placa, marca, modelo, anio, color, titulo, motivo, fotos, estatus, fecha_ingreso) 
                     VALUES (@placa, @marca, @modelo, @anio, @color, @titulo, @motivo, @fotos, @estatus, GETDATE())`);
 
-        res.json({ success: true, message: "Vehículo registrado (Beta)" });
+        res.json({ success: true, message: 'Vehículo registrado correctamente' });
     } catch (err) {
         res.status(500).send(err.message);
     }
 });
 
-app.get('/api/vehiculos', async (req, res) => {
+// D) Eliminar vehículo (Registro + Fotos físicas)
+app.delete('/api/vehiculos/:id', async (req, res) => {
     try {
+        const { id } = req.params;
         const pool = await poolPromise;
-        // Traemos todos los que no estén liberados
-        const result = await pool.request().query("SELECT * FROM vehiculos WHERE liberado_el IS NULL ORDER BY fecha_ingreso DESC");
 
-        const vehiculos = result.recordset.map(v => ({
-            ...v,
-            fotos: JSON.parse(v.fotos || '[]') // Convertimos el texto en Array
-        }));
+        // 1. Buscamos las fotos para borrarlas del disco duro
+        const vehiculo = await pool.request().input('id', sql.Int, id)
+            .query('SELECT fotos FROM vehiculos WHERE id = @id');
 
-        res.status(200).json(vehiculos);
-    } catch (error) { 
-        console.error(error);
-        res.status(500).json({ message: 'Error al obtener vehiculos' });
-    }
-});
-
-app.get('/api/stats', async (req, res) => {
-  try {
-    const pool = await poolPromise;
-    const result = await pool.request().query(`
-      SELECT 
-        (SELECT COUNT(*) FROM vehiculos) as total,
-        (SELECT COUNT(*) FROM vehiculos WHERE CAST(fecha_ingreso AS DATE) = CAST(GETDATE() AS DATE)) as hoy,
-        (SELECT COUNT(*) FROM vehiculos WHERE estatus = 'Liberado') as liberados
-    `);
-    res.json(result.recordset[0]);
-  } catch (err) {
-    res.status(500).send(err.message);
-  }
-});
-
-app.get('/api/vehiculos/:id', async (req, res) => {
-    try {
-        const id = req.params.id; // Obtenemos el ID de la URL
-        const pool = await poolPromise;
-        
-        // Buscamos solo el vehículo que coincida con ese ID
-        const result = await pool.request()
-            .input('id', sql.Int, id)
-            .query("SELECT * FROM vehiculos WHERE id = @id");
-
-        if (result.recordset.length === 0) {
-            return res.status(404).json({ message: 'Vehículo no encontrado' });
+        if (vehiculo.recordset[0] && vehiculo.recordset[0].fotos) {
+            const fotos = JSON.parse(vehiculo.recordset[0].fotos);
+            fotos.forEach(fotoPath => {
+                if (fs.existsSync(fotoPath)) fs.unlinkSync(fotoPath);
+            });
         }
 
-        // Preparamos el objeto para enviarlo al Frontend
-        const vehiculo = {
-            ...result.recordset[0],
-            // IMPORTANTE: Convertimos el texto de las fotos en un Array real
-            fotos: JSON.parse(result.recordset[0].fotos || '[]')
-        };
+        // 2. Borramos de la base de datos
+        await pool.request().input('id', sql.Int, id).query('DELETE FROM vehiculos WHERE id = @id');
         
-        res.status(200).json(vehiculo);
-    } catch (error) {
-        console.error("Error al obtener detalle:", error);
-        res.status(500).json({ message: 'Error en el servidor' });
+        res.json({ success: true, message: 'Vehículo y archivos eliminados' });
+    } catch (err) {
+        res.status(500).send(err.message);
     }
 });
 
-app.post('/api/login', (req, res) => {
-    const { username, password } = req.body;
-    if (username === 'admin' && password === '123') {
-        res.json({ success: true, message: "Bienvenido" });
-    } else {
-        res.status(401).json({ success: false, message: "Credenciales inválidas" });
-    }
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Servidor Corralink corriendo en http://localhost:${PORT}`);
 });
