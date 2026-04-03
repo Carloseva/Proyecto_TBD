@@ -2,22 +2,19 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
-// 1. Importamos nuestra función universal
 import { getImageUrl } from '../utils/formatters';
 
 const route = useRoute();
 const router = useRouter();
-
 const vehiculo = ref(null);
 const vehiculoId = route.params.id;
 
 onMounted(async () => {
   try {
-    // Pedimos al backend los datos (el server.js ya debe tener el JSON.parse para las fotos)
     const response = await axios.get(`http://localhost:3000/api/vehiculos/${vehiculoId}`);
     vehiculo.value = response.data;
   } catch (error) {
-    console.error('Error al cargar los detalles del vehículo:', error);
+    console.error('Error al cargar detalles:', error);
   }
 });
 
@@ -29,11 +26,11 @@ function regresar() {
 <template>
   <div v-if="vehiculo" class="detalle-container">
     <button @click="regresar" class="btn-regresar">
-      &larr; Regresar al Inventario
+      &larr; Regresar
     </button>
 
-    <h1>Detalles de: {{ vehiculo.marca }} {{ vehiculo.modelo }}</h1>
-    <p class="placa-badge">Placa: {{ vehiculo.placa }}</p>
+    <h1>{{ vehiculo.marca }} {{ vehiculo.modelo }}</h1>
+    <div class="badge-placa">Placa: {{ vehiculo.placa }}</div>
 
     <div class="galeria-fotos">
       <img 
@@ -41,118 +38,82 @@ function regresar() {
         :key="index" 
         :src="getImageUrl(foto)" 
         alt="Foto del vehículo"
-        class="foto-detalle"
       >
     </div>
 
-    <div class="info-grid">
-        <ul class="lista-detalles">
-          <li><strong>Año:</strong> {{ vehiculo.anio }}</li>
-          <li><strong>Color:</strong> {{ vehiculo.color }}</li>
-          <li><strong>Estatus Actual:</strong> <span class="status-text">{{ vehiculo.estatus || 'Sin especificar' }}</span></li>
-          <li><strong>Documento:</strong> {{ vehiculo.titulo }}</li>
-          <li><strong>Motivo de Ingreso:</strong> {{ vehiculo.motivo }}</li>
-        </ul>
-    </div>
+    <ul class="lista-info">
+      <li><strong>Año:</strong> {{ vehiculo.anio }}</li>
+      <li><strong>Color:</strong> {{ vehiculo.color }}</li>
+      <li><strong>Estatus:</strong> <span class="status">{{ vehiculo.estatus }}</span></li>
+      <li><strong>Documentación:</strong> {{ vehiculo.titulo }}</li>
+      <li><strong>Motivo de Ingreso:</strong> 
+        <p class="motivo-texto">{{ vehiculo.motivo }}</p>
+      </li>
+    </ul>
   </div>
 
-  <div v-else class="loading-state">
-    <p>Cargando información del vehículo...</p>
+  <div v-else class="loading">
+    <p>Cargando detalles del vehículo...</p>
   </div>
 </template>
 
 <style scoped>
-/* Mezcla de estilos del original y el nuevo para mejor apariencia */
 .detalle-container {
-  background: linear-gradient(to right, #2c3e50, #0a0e12); /* Fondo oscuro profesional */
-  padding: 2.5rem;
+  background: linear-gradient(to right, #2c3e50, #0a0e12);
+  padding: 2rem;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   color: white;
-  animation: fadeIn 0.4s ease-out;
-}
-
-h1 {
-  margin: 0;
-  font-size: 2rem;
-  color: #fff;
-}
-
-.placa-badge {
-    background-color: #f39c12;
-    display: inline-block;
-    padding: 0.3rem 0.8rem;
-    border-radius: 4px;
-    color: #000;
-    font-weight: bold;
-    margin-top: 0.5rem;
-    margin-bottom: 2rem;
+  min-height: 80vh;
 }
 
 .btn-regresar {
-  background: linear-gradient(to right, #5ab96a, #01655c);
+  background: #34495e;
   color: white;
   border: none;
-  padding: 0.7rem 1.2rem;
-  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  border-radius: 5px;
   cursor: pointer;
-  font-weight: bold;
-  margin-bottom: 2rem;
-  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
 }
 
-.btn-regresar:hover {
-  transform: translateX(-5px);
-  filter: brightness(1.2);
+.badge-placa {
+  background-color: #f39c12;
+  color: black;
+  display: inline-block;
+  padding: 0.2rem 0.8rem;
+  border-radius: 4px;
+  font-weight: bold;
+  margin-bottom: 2rem;
 }
 
 .galeria-fotos {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.2rem;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  gap: 1rem;
+  margin-bottom: 2rem;
 }
 
-.foto-detalle {
-  width: 280px;
-  height: 200px;
+.galeria-fotos img {
+  width: 250px;
+  height: 180px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 2px solid rgba(255,255,255,0.1);
-  transition: transform 0.3s;
 }
 
-.foto-detalle:hover {
-    transform: scale(1.03);
-    border-color: #5ab96a;
-}
-
-.lista-detalles {
+.lista-info {
   list-style: none;
   padding: 0;
 }
 
-.lista-detalles li {
+.lista-info li {
   font-size: 1.2rem;
-  padding: 0.8rem 0;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  color: #bdc3c7;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
-.lista-detalles strong {
-  color: #f39c12;
-  margin-right: 10px;
-}
-
-.status-text {
-    color: #2ecc71;
-    font-weight: bold;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+.lista-info strong { color: #f39c12; }
+.status { color: #2ecc71; font-weight: bold; }
+.motivo-texto { color: #bdc3c7; font-size: 1rem; margin-top: 0.5rem; }
 </style>
