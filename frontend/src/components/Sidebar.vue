@@ -28,11 +28,9 @@ function cerrarSesion() {
 
       <div v-if="esAdmin">
         <div class="divider">Administración</div>
-        
         <router-link to="/registrar" class="nav-link">
           <span class="icon">➕</span> Registrar
         </router-link>
-        
         <router-link to="/inventario" class="nav-link">
           <span class="icon">🚗</span> Inventario
         </router-link>
@@ -43,7 +41,6 @@ function cerrarSesion() {
       <router-link v-if="!esAdmin" to="/login" class="nav-link login-btn">
         <span class="icon">🔐</span> Iniciar Sesión
       </router-link>
-
       <button v-else @click="cerrarSesion" class="nav-link logout-btn">
         <span class="icon">🚪</span> Salir del Sistema
       </button>
@@ -52,79 +49,35 @@ function cerrarSesion() {
 </template>
 
 <style scoped>
+/* Tu estilo anterior del Sidebar que ya funcionaba bien */
 .sidebar {
   width: 250px;
-  background-color: #2c3e50;
+  background: linear-gradient(to bottom, #2c3e50, #0a0e12);
   color: white;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  height: 100vh; /* Para que ocupe todo el alto */
+  height: 100vh;
   box-sizing: border-box;
 }
-
 .sidebar h3 {
   text-align: center;
   margin-bottom: 2rem;
   font-size: 1.5rem;
-  color: #42b983;
+  background: linear-gradient(to right, #42b983, #3498db);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-
-.navigation-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
+.navigation-menu { display: flex; flex-direction: column; gap: 0.5rem; }
 .nav-link {
-  display: flex;
-  align-items: center;
-  padding: 0.8rem 1rem;
-  color: #bdc3c7;
-  text-decoration: none;
-  border-radius: 6px;
+  display: flex; align-items: center; padding: 0.8rem 1rem;
+  color: #bdc3c7; text-decoration: none; border-radius: 6px;
   transition: all 0.3s;
-  cursor: pointer;
-  background: none;
-  border: none;
-  width: 100%;
-  font-size: 1rem;
 }
-
-.nav-link .icon {
-  margin-right: 0.8rem;
-}
-
-.nav-link:hover {
-  background-color: #34495e;
-  color: #ffffff;
-}
-
-.router-link-exact-active {
-  background-color: #42b983;
-  color: #ffffff;
-  font-weight: bold;
-}
-
-.divider {
-  margin: 1.5rem 0 0.5rem 0;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  color: #7f8c8d;
-  border-bottom: 1px solid #3e5871;
-  padding-bottom: 5px;
-}
-
-.bottom-links {
-  margin-top: auto; /* Empuja el botón al final */
-}
-
-.logout-btn {
-  color: #e74c3c;
-}
-
-.logout-btn:hover {
-  background-color: #c0392b;
-  color: white;
-}
+.nav-link:hover { background-color: #34495e; color: white; transform: translateX(5px); }
+.router-link-exact-active { background-color: #42b983; color: white; font-weight: bold; }
+.divider { margin: 1.5rem 0 0.5rem 0; font-size: 0.75rem; text-transform: uppercase; color: #7f8c8d; border-bottom: 1px solid #3e5871; padding-bottom: 5px; }
+.bottom-links { margin-top: auto; }
+.logout-btn { color: #e74c3c; border: none; background: none; cursor: pointer; width: 100%; text-align: left; }
 </style>
