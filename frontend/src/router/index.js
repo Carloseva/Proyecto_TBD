@@ -34,7 +34,7 @@ const router = createRouter({
     {
       path: '/vehiculo/:id', // El :id es un parámetro dinámico
       name: 'vehiculoDetalle',
-      component:() => import('../components/VehiculoDetalle.vue')
+      component: VehiculoDetalle
     },
     {
       path: '/login',
