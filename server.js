@@ -142,3 +142,20 @@ const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Servidor activo en puerto ${PORT}`);
 });
+
+app.patch('/api/vehiculos/:id/estatus', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estatus } = req.body;
+        const pool = await poolPromise;
+
+        await pool.request()
+            .input('id', sql.Int, id)
+            .input('estatus', sql.VarChar, estatus)
+            .query('UPDATE vehiculos SET estatus = @estatus WHERE id = @id');
+
+        res.json({ success: true, message: 'Estatus actualizado correctamente.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
