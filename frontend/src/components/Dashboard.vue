@@ -66,17 +66,17 @@ function getImageUrl(rutaOriginal) {
     
     <div class="stats-container">
       <div class="stat-card">
-        <h2>{{ stats.totalVehiculos }}</h2>
+        <h2>{{ stats.total || 0 }}</h2>
         <p>Vehículos en Corralón</p>
       </div>
 
       <div class="stat-card green">
-        <h2>{{ stats.ingresosHoy }}</h2>
+        <h2>{{ stats.hoy || 0 }}</h2>
         <p>Ingresados Hoy</p>
       </div>
 
       <div class="stat-card red">
-        <h2>{{ stats.liberadosHoy }}</h2>
+        <h2>{{ stats.liberados || 0 }}</h2>
         <p>Liberados Hoy</p>
       </div>
     </div>
