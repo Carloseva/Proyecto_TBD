@@ -20,7 +20,7 @@ import Sidebar from './components/Sidebar.vue';
 .content-area {
   flex-grow: 1;
   padding: 2rem;
-  background-color: #1b1c1d;
+  background-color: transparent;
   overflow-y: auto;
 }
 </style>
