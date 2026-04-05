@@ -1,9 +1,8 @@
-// RegistroVehiculo.vue
-
 <script setup>
 import { reactive, ref } from 'vue';
-import axios from 'axios'; // <-- IMPORTA AXIOS
+import axios from 'axios';
 
+const API_BASE_URL = 'http://localhost:3000';
 const anioActual = new Date().getFullYear();
 const opcionesTitulo = [
   'Factura Original',
@@ -14,8 +13,6 @@ const opcionesTitulo = [
   'Otro'
 ];
 
-// ---> LA LÍNEA DEL ERROR ESTÁ AQUÍ <---
-// Asegúrate de que esta declaración exista y esté bien escrita.
 const vehiculo = reactive({
   placa: '',
   marca: '',
@@ -28,82 +25,97 @@ const vehiculo = reactive({
 
 const fotos = ref([]);
 const fotoPrincipalPreview = ref(null);
+
 function handleFileUpload(event) {
-  const archivos = event.target.files;
-  if (!archivos.length) return;
-  fotos.value = Array.from(archivos);
-  fotoPrincipalPreview.value = URL.createObjectURL(archivos[0]);
+  const archivosNuevos = event.target.files;
+  if (!archivosNuevos.length) return;
+
+  const limiteFotos = 20;
+  const espacioDisponible = limiteFotos - fotos.value.length;
+
+  if (espacioDisponible <= 0) {
+    alert('Ya has alcanzado el límite de 20 fotos.');
+    event.target.value = '';
+    return;
+  }
+
+  let archivosParaAgregar = Array.from(archivosNuevos);
+
+  if (archivosNuevos.length > espacioDisponible) {
+    alert(`Solo puedes agregar ${espacioDisponible} fotos más. Se agregarán las primeras ${espacioDisponible} de tu selección.`);
+    archivosParaAgregar = archivosParaAgregar.slice(0, espacioDisponible);
+  }
+
+  const nuevosObjetosFoto = archivosParaAgregar.map(file => {
+    return {
+      file: file,
+      url: URL.createObjectURL(file)
+    };
+  });
+
+  fotos.value.push(...nuevosObjetosFoto);
+  
+  event.target.value = '';
 }
 
-const mensajeExito = ref('');
-const cargando = ref(false);
-
-const enviarFormulario = async () => {
-  cargando.value = true;
-  const formData = new FormData();
-  // ... (aquí va tu lógica de agregar los campos al formData)
-  
-  try {
-    const response = await axios.post('http://localhost:3000/api/registrar-vehiculo', formData);
-    
-    if (response.data.success) {
-      mensajeExito.value = "✅ ¡Vehículo registrado exitosamente!";
-      
-      // Limpiamos el formulario (Lógica de Reset)
-      Object.keys(vehiculo.value).forEach(key => vehiculo.value[key] = '');
-      imagenesPreview.value = []; // Si tienes preview de fotos
-      
-      // Quitamos el mensaje después de 4 segundos
-      setTimeout(() => { mensajeExito.value = ''; }, 4000);
-    }
-  } catch (error) {
-    // Manejo de error de placa duplicada (409)
-    if (error.response?.status === 409) {
-      alert(error.response.data.message);
-    }
-  } finally {
-    cargando.value = false;
-  }
-};
+function eliminarFoto(index){
+  fotos.value.splice(index, 1);
+}
 
 async function registrar() {
-  // 1. Crear un objeto FormData para empaquetar los datos y las fotos
   const formData = new FormData();
 
-  // 2. Añadir todos los datos de texto del vehículo
   for (const key in vehiculo) {
     formData.append(key, vehiculo[key]);
   }
 
-  // 3. Añadir todos los archivos de las fotos
-  for (const foto of fotos.value) {
-    formData.append('fotos', foto); // El nombre 'fotos' debe coincidir con el del backend
+  for (const fotoObj of fotos.value) {
+    formData.append('fotos', fotoObj.file);
   }
 
-  // 4. Enviar los datos al servidor usando Axios
   try {
-    const response = await axios.post('http://localhost:3000/api/registrar-vehiculo', formData, {
+    const response = await axios.post(`${API_BASE_URL}/api/registrar-vehiculo`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
     
-    // Si todo salió bien, el servidor nos responderá
     console.log('Respuesta del servidor:', response.data);
     alert('¡Vehículo registrado con éxito!');
-    // Aquí podrías limpiar el formulario o redirigir al usuario
+    
 
   } catch (error) {
     console.error('Error al registrar el vehículo:', error);
     alert('Hubo un error al registrar el vehículo.');
   }
 }
+
+function resetForm() {
+  Object.assign(vehiculo, {
+    placa: '',
+    marca: '',
+    modelo: '',
+    anio: null,
+    titulo: '',
+    color: '',
+    motivo: ''
+  });
+  
+  fotos.value = [];
+}
 </script>
 
 <template>
-  <div class="formulario-container">
+  <div class="formulario-container"> 
+    <button 
+      type="button" 
+      @click="resetForm" 
+      class="btn-reset-lateral"
+    >
+      🔄️
+    </button>
+
     <h2>Otro para la colección: Registra el Vehículo</h2>
-    
     <form @submit.prevent="registrar">
       <div class="campo">
         <label for="placa">Placa:</label>
@@ -112,7 +124,7 @@ async function registrar() {
 
       <div class="campo">
         <label for="marca">Marca:</label>
-        <input type="text" id="marca" placeholder="¿Qué auto abandonaron ahora?" v-model="vehiculo.marca">
+        <input type="text" id="marca" placeholder="Ej. Nissan" v-model="vehiculo.marca">
       </div>
       
       <div class="campo">
@@ -134,7 +146,7 @@ async function registrar() {
 
       <div class="campo">
         <label for="titulo">Tipo de Título/Documento:</label>
-        <select id="titulo" v-model="vehiculo.titulo">
+        <select id="titulo" v-model="vehiculo.titulo" class="estilo-input" required> 
           <option disabled value="">-- Selecciona una opción --</option>
           <option v-for="opcion in opcionesTitulo" :key="opcion" :value="opcion">
             {{ opcion }}
@@ -149,7 +161,7 @@ async function registrar() {
       
       <div class="campo">
         <label for="motivo">Motivo de Ingreso:</label>
-        <textarea id="motivo" rows="3" placeholder="Ej. Estacionado en lugar prohibido" v-model="vehiculo.motivo"></textarea>
+        <textarea type="text" id="motivo" rows="3" placeholder="Ej. Estacionado en lugar prohibido" v-model="vehiculo.motivo"></textarea>
       </div>
 
       <div class="campo">
@@ -168,34 +180,47 @@ async function registrar() {
           @change="handleFileUpload"
         >
         
-        <div v-if="fotoPrincipalPreview" class="foto-preview">
-          <img :src="fotoPrincipalPreview" alt="Vista previa de la foto principal">
+        <div v-if="fotos.length > 0" class="foto-preview-gallery">
+          <div 
+            v-for="(foto, index) in fotos" 
+            :key="foto.url" 
+            class="foto-preview-card"
+          >
+            <img :src="foto.url" alt="Vista previa">
+
+            <button 
+              type="button" 
+              @click.stop="eliminarFoto(index)" 
+              class="btn-eliminar-foto"
+            >
+              &times;
+            </button>
+          </div>
         </div>
       </div>
 
       <button type="submit">¡Registrar y Multar!</button>
     </form>
   </div>
-
-  
 </template>
 
 <style scoped>
 .formulario-container {
+  position: relative;
   max-width: 600px;
   margin: 2rem auto;
   padding: 2rem;
-  border: 2px solid #ffffffff; /* Borde de advertencia amarillo */
+  border: 2px solid #ffffffff;
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  background-color: #222627; /* Fondo amarillo pálido */
+  background: linear-gradient(to right, #2c3e50, #0a0e12);
 }
 
 h2 {
   text-align: center;
   margin-bottom: 1.5rem;
-  color: #ffffffff; /* Color oscuro para el título */
-  font-family: 'Courier New', Courier, monospace; /* Una fuente más ruda */
+  color: #ffffffff;
+  font-family: 'Courier New', Courier, monospace;
 }
 
 .campo {
@@ -219,7 +244,6 @@ input, textarea {
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 
-/* Cuando el usuario hace clic en un campo, el borde se pone rojo */
 input:focus, textarea:focus {
   border-color: #dc3545;
   box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25);
@@ -231,7 +255,7 @@ button {
   padding: 0.8rem;
   border: none;
   border-radius: 4px;
-  background-color: #01655c; /* Botón de "peligro" rojo */
+  background: linear-gradient(to right, #5ab96a, #01655c);
   color: white;
   font-size: 1rem;
   font-weight: bold;
@@ -241,12 +265,11 @@ button {
 }
 
 button:hover {
-  background-color: #c82333; /* Un rojo más oscuro al pasar el mouse */
+  background-color: #c82333;
 }
 
-/* --- Estilos para la subida de archivos --- */
 .input-file-hidden {
-  display: none; /* Oculta el input de archivo por defecto */
+  display: none;
 }
 
 .input-file-trigger {
@@ -255,7 +278,7 @@ button:hover {
   padding: 0.8rem;
   border: none;
   border-radius: 4px;
-  background-color: #01655c;
+  background: linear-gradient(to right, #5ab96a, #01655c);
   color: white;
   font-size: 1rem;
   font-weight: bold;
@@ -270,16 +293,96 @@ button:hover {
   background-color: #42b983;
 }
 
-.foto-preview {
+.foto-preview-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
   margin-top: 1rem;
-  text-align: center;
 }
 
-.foto-preview img {
-  max-width: 100%;
-  max-height: 250px;
+.foto-preview-card {
+  position: relative;
+  width: 120px;
+  height: 90px;
   border-radius: 8px;
-  border: 2px solid #ddd;
+  overflow: hidden;
+  border: 1px solid #ddd;
+}
+
+.foto-preview-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.btn-eliminar-foto {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0;
+  padding-bottom: 2px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-eliminar-foto:hover {
+  background-color: #dc3545;
+}
+
+.btn-reset-lateral{
+  position: absolute;
+  top: 0;
+  transform: translateX(calc(-100% - 3rem));
+  width: 70px;
+  height:100%;
+  background-color: #01655c;
+  border:none;
+  border-radius: 8px;
+  color: white;
+  font-size: 2.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: background-color 0.3s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.btn-reset-lateral:hover {
+  background-color: #c82333;
+}
+
+.estilo-input {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.estilo-input:focus {
+  outline: none;
+  border-color: #3498db;
 }
 
 </style>
