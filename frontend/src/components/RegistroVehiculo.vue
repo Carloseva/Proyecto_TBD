@@ -35,6 +35,37 @@ function handleFileUpload(event) {
   fotoPrincipalPreview.value = URL.createObjectURL(archivos[0]);
 }
 
+const mensajeExito = ref('');
+const cargando = ref(false);
+
+const enviarFormulario = async () => {
+  cargando.value = true;
+  const formData = new FormData();
+  // ... (aquí va tu lógica de agregar los campos al formData)
+  
+  try {
+    const response = await axios.post('http://localhost:3000/api/registrar-vehiculo', formData);
+    
+    if (response.data.success) {
+      mensajeExito.value = "✅ ¡Vehículo registrado exitosamente!";
+      
+      // Limpiamos el formulario (Lógica de Reset)
+      Object.keys(vehiculo.value).forEach(key => vehiculo.value[key] = '');
+      imagenesPreview.value = []; // Si tienes preview de fotos
+      
+      // Quitamos el mensaje después de 4 segundos
+      setTimeout(() => { mensajeExito.value = ''; }, 4000);
+    }
+  } catch (error) {
+    // Manejo de error de placa duplicada (409)
+    if (error.response?.status === 409) {
+      alert(error.response.data.message);
+    }
+  } finally {
+    cargando.value = false;
+  }
+};
+
 async function registrar() {
   // 1. Crear un objeto FormData para empaquetar los datos y las fotos
   const formData = new FormData();
