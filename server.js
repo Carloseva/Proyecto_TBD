@@ -18,10 +18,10 @@ app.use('/uploads', express.static(uploadDir));
 
 // 2. CONFIGURACIÓN DE BASE DE DATOS (SQL SERVER)
 const dbConfig = {
-    user: 'sa', 
-    password: 'tu_password', 
-    server: 'localhost',
-    database: 'CorralinkDB',
+    user: 'db_ac7687_corralondb_admin',
+    password: 'passw0rd#',
+    server: 'sql5111.site4now.net',
+    database: 'db_ac7687_corralondb',
     options: {
         encrypt: false,
         trustServerCertificate: true
