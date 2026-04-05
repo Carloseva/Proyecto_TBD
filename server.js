@@ -159,3 +159,26 @@ app.patch('/api/vehiculos/:id/estatus', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// OBTENER UN SOLO VEHÍCULO POR SU ID
+app.get('/api/vehiculos/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await poolPromise;
+        
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query('SELECT * FROM vehiculos WHERE id = @id');
+
+        if (result.recordset.length > 0) {
+            const vehiculo = result.recordset[0];
+            // Convertimos el texto de SQL a un Array real para que Vue pueda leer las fotos
+            vehiculo.fotos = vehiculo.fotos ? JSON.parse(vehiculo.fotos) : [];
+            res.json(vehiculo);
+        } else {
+            res.status(404).json({ message: 'Vehículo no encontrado' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
