@@ -21,7 +21,13 @@ onMounted(async () => {
       axios.get(`${API_BASE_URL}/api/vehiculos`)
     ]);
 
-    stats.value = statsRes.data;
+    // Conectamos las variables de SQL Server con las que espera tu diseño de Vue
+    stats.value = {
+      totalVehiculos: statsRes.data.total || 0,
+      ingresosHoy: statsRes.data.hoy || 0,
+      liberadosHoy: statsRes.data.liberados || 0
+    };
+    
     inventario.value = inventarioRes.data;
 
   } catch (error) {
@@ -32,10 +38,11 @@ onMounted(async () => {
 const inventarioFiltrado = computed(() => {
     let resultado = [...inventario.value];
 
+    // Actualizamos 'estatus' por 'Estado' que es como se llama en SQL Server
     if (filtroSeleccionado.value === 'Venta') {
-        resultado = resultado.filter(v => v.estatus === 'Para vender');
+        resultado = resultado.filter(v => v.Estado === 'Para vender');
     } else if (filtroSeleccionado.value === 'Sin especificar') {
-        resultado = resultado.filter(v => v.estatus === 'Sin especificar');
+        resultado = resultado.filter(v => v.Estado === 'Sin especificar');
     }
 
     if (filtroSeleccionado.value === 'Viejos') {
@@ -100,9 +107,9 @@ function getImageUrl(rutaOriginal) {
     <div class="vehiculo-grid">
       <div 
         v-for="vehiculo in inventarioFiltrado" 
-        :key="vehiculo.id" 
+        :key="vehiculo.ID_Registro" 
         class="vehiculo-card" 
-        @click="verDetalle(vehiculo.id)"
+        @click="verDetalle(vehiculo.ID_Registro)"
       >
         <img 
           v-if="vehiculo.fotos && vehiculo.fotos.length > 0" 
@@ -116,8 +123,8 @@ function getImageUrl(rutaOriginal) {
         </div>
         
         <div class="card-banner">
-          <h4>{{ vehiculo.marca }} {{ vehiculo.modelo }}</h4>
-          <p>{{ vehiculo.anio }}</p>
+          <h4>{{ vehiculo.Marca }} {{ vehiculo.Modelo }}</h4>
+          <p>{{ vehiculo.Anio }}</p>
         </div>
       </div>
     </div>

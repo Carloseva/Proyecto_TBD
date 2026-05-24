@@ -17,7 +17,7 @@ const mostrarEditor = ref(false);
 const isModalVisible = ref(false);
 const selectedImageUrl = ref('');
 
-const estatusOpciones = ['Sin especificar', 'Para triturar', 'Para vender', 'Liberar'];
+const estatusOpciones = ['Sin especificar', 'Para triturar', 'Para vender', 'Liberado'];
 const estatusMensaje = ref('');
 
 const mostrarModalCita = ref(false);
@@ -27,8 +27,10 @@ const datosCita = reactive({
   licencia: '',
   correo: ''
 });
+
+// Actualizado a vehiculo.value?.Estado
 const mostrarBotonCita = computed(() => {
-  return !puedeEditar.value && vehiculo.value?.estatus === 'Para vender';
+  return !puedeEditar.value && vehiculo.value?.Estado === 'Para vender';
 });
 
 function agendarCita() {
@@ -40,14 +42,26 @@ function agendarCita() {
   Object.assign(datosCita, { nombre: '', rfc: '', licencia: '', correo: '' });
 }
 
-onMounted(async () => {
+// Función separada para poder llamarla cuando el hijo avise
+async function cargarDatosVehiculo() {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/vehiculos/${vehiculoId}`);
     vehiculo.value = response.data;
   } catch (error) {
-    console.error('Error al cargar los detalles del vehículo:', error);
+    console.error('Error al cargar los detalles:', error);
   }
+}
+
+// Se ejecuta al cargar la página por primera vez
+onMounted(() => {
+  cargarDatosVehiculo();
 });
+
+// Se ejecuta cuando el componente hijo (EditarVehiculo) grita "¡Ya terminé!"
+function alTerminarEdicion() {
+  mostrarEditor.value = false;
+  cargarDatosVehiculo();
+}
 
 function regresar() {
   router.back();
@@ -67,14 +81,16 @@ async function actualizarEstatus() {
 
   try {
     estatusMensaje.value = 'Guardando...';
-    const nuevoEstatus = vehiculo.value.estatus;
+    // Actualizado a vehiculo.value.Estado
+    const nuevoEstatus = vehiculo.value.Estado;
 
-    await axios.patch(`${API_BASE_URL}/api/vehiculos/${vehiculo.value.id}/estatus`, {
+    // Actualizado a vehiculo.value.ID_Registro
+    await axios.patch(`${API_BASE_URL}/api/vehiculos/${vehiculo.value.ID_Registro}/estatus`, {
       estatus: nuevoEstatus
     });
 
-    if (nuevoEstatus === 'Liberar') {
-      estatusMensaje.value = '¡Liberado! Se ocultará del inventario y se eliminará en 7 días.';
+    if (nuevoEstatus === 'Liberado') {
+      estatusMensaje.value = '¡Liberado! Se ocultará del inventario.';
     } else {
       estatusMensaje.value = '¡Estatus actualizado!';
     }
@@ -110,7 +126,7 @@ function getImageUrl(rutaOriginal) {
       📅 Me interesa este auto
     </button>
 
-    <h1>Detalles de: {{ vehiculo.marca }} {{ vehiculo.modelo }} ({{ vehiculo.placa }})</h1>
+    <h1>Detalles de: {{ vehiculo.Marca }} {{ vehiculo.Modelo }} ({{ vehiculo.Placa }})</h1>
 
     <ul class="lista-detalles">
       </ul>
@@ -120,7 +136,7 @@ function getImageUrl(rutaOriginal) {
       <h3>Cambiar Estatus del Vehículo</h3>
       <p>La selección se guarda automáticamente.</p>
       <select 
-        v-model="vehiculo.estatus" 
+        v-model="vehiculo.Estado" 
         @change="actualizarEstatus"
         class="estatus-select"
       >
@@ -135,7 +151,11 @@ function getImageUrl(rutaOriginal) {
       <span v-if="estatusMensaje" class="estatus-feedback">{{ estatusMensaje }}</span>
     </div>
 
-    <EditarVehiculo v-if="mostrarEditor && puedeEditar" :idVehiculo="vehiculoId" />
+    <EditarVehiculo 
+        v-if="mostrarEditor && puedeEditar" 
+        :idVehiculo="vehiculoId" 
+        @edicion-terminada="alTerminarEdicion"
+    />
 
     <div class="galeria-fotos">
       <img 
@@ -148,10 +168,10 @@ function getImageUrl(rutaOriginal) {
     </div>
 
     <ul class="lista-detalles">
-      <li><strong>Año:</strong> {{ vehiculo.anio }}</li>
-      <li><strong>Color:</strong> {{ vehiculo.color }}</li>
-      <li><strong>Documento:</strong> {{ vehiculo.titulo }}</li>
-      <li><strong>Motivo de Ingreso:</strong> {{ vehiculo.motivo }}</li>
+      <li><strong>Año:</strong> {{ vehiculo.Anio }}</li>
+      <li><strong>Color:</strong> {{ vehiculo.Color }}</li>
+      <li><strong>Documento:</strong> {{ vehiculo.TipoDocumento }}</li>
+      <li><strong>Motivo de Ingreso:</strong> {{ vehiculo.MotivoIngreso }}</li>
     </ul>
   </div>
 

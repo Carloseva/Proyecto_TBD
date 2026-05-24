@@ -24,9 +24,10 @@ const resultados = computed(() => {
   
   const query = terminoBusqueda.value.toLowerCase();
   return todosLosVehiculos.value.filter(v => 
-    v.placa.toLowerCase().includes(query) ||
-    v.marca.toLowerCase().includes(query) ||
-    v.modelo.toLowerCase().includes(query)
+    // Actualizamos a las variables de SQL Server y agregamos un fallback seguro
+    (v.Placa || '').toLowerCase().includes(query) ||
+    (v.Marca || '').toLowerCase().includes(query) ||
+    (v.Modelo || '').toLowerCase().includes(query)
   );
 });
 
@@ -52,14 +53,16 @@ function verDetalle(id) {
     <div v-if="resultados.length > 0" class="results-grid">
       <div 
         v-for="vehiculo in resultados" 
-        :key="vehiculo.id" 
+        :key="vehiculo.ID_Registro" 
         class="mini-card"
-        @click="verDetalle(vehiculo.id)"
+        @click="verDetalle(vehiculo.ID_Registro)"
       >
-        <img :src="getImageUrl(vehiculo.fotos[0])" alt="Auto">
+        <img v-if="vehiculo.fotos && vehiculo.fotos.length > 0" :src="getImageUrl(vehiculo.fotos[0])" alt="Auto">
+        <div v-else class="img-placeholder">🚗</div>
+        
         <div class="mini-info">
-          <span class="placa">{{ vehiculo.placa }}</span>
-          <span class="modelo">{{ vehiculo.marca }} {{ vehiculo.modelo }}</span>
+          <span class="placa">{{ vehiculo.Placa }}</span>
+          <span class="modelo">{{ vehiculo.Marca }} {{ vehiculo.Modelo }}</span>
         </div>
       </div>
     </div>
@@ -115,6 +118,16 @@ function verDetalle(id) {
 
 .mini-card img { width: 100%; height: 120px; object-fit: cover; }
 
+.img-placeholder {
+  width: 100%;
+  height: 120px;
+  background-color: #34495e;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 3rem;
+}
+
 .mini-info {
   padding: 0.8rem;
   display: flex;
@@ -123,7 +136,7 @@ function verDetalle(id) {
 }
 
 .placa { font-weight: bold; color: #f39c12; }
-.modelo { font-size: 0.9rem; margin-top: 4px; }
+.modelo { font-size: 0.9rem; margin-top: 4px; text-transform: capitalize; }
 
-.no-results { text-align: center; color: #7f8c8d; margin-top: 2rem; }
+.no-results { text-align: center; color: #7f8c8d; margin-top: 2rem; font-size: 1.2rem; }
 </style>

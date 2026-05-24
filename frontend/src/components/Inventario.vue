@@ -27,11 +27,12 @@ const inventarioFiltrado = computed(() => {
   
   const busqueda = terminoBusqueda.value.toLowerCase().trim();
   return inventario.value.filter(vehiculo => {
-    const placa = (vehiculo.placa || '').toLowerCase();
-    const marca = (vehiculo.marca || '').toLowerCase();
-    const modelo = (vehiculo.modelo || '').toLowerCase();
-    const color = (vehiculo.color || '').toLowerCase();
-    const anio = (vehiculo.anio || '').toString();
+    // Actualizado a mayúsculas para coincidir con SQL Server
+    const placa = (vehiculo.Placa || '').toLowerCase();
+    const marca = (vehiculo.Marca || '').toLowerCase();
+    const modelo = (vehiculo.Modelo || '').toLowerCase();
+    const color = (vehiculo.Color || '').toLowerCase();
+    const anio = (vehiculo.Anio || '').toString();
 
     return (
       placa.includes(busqueda) || marca.includes(busqueda) ||
@@ -61,6 +62,22 @@ async function eliminarVehiculo(id) {
     setTimeout(() => mensajeSistema.value = '', 3000);
   } catch (error) {
     alert('Error al eliminar el vehículo');
+    console.error(error);
+  }
+}
+
+async function liberarVehiculo(id) {
+  if (!confirm('✅ ¿Confirmar que el dueño ya pagó y se libera el vehículo?')) {
+    return;
+  }
+
+  try {
+    await axios.patch(`${API_BASE_URL}/api/vehiculos/${id}/estatus`, { estatus: 'Liberado' });
+    mensajeSistema.value = '¡Vehículo liberado con éxito!';
+    cargarInventario(); // Recarga la tabla
+    setTimeout(() => mensajeSistema.value = '', 3000);
+  } catch (error) {
+    alert('Error al liberar el vehículo');
     console.error(error);
   }
 }
@@ -122,13 +139,14 @@ function getImageUrl(rutaOriginal) {
           <th>Modelo</th>
           <th>Año</th>
           <th>Fecha</th>
-          <th>Acciones</th> </tr>
+          <th>Acciones</th> 
+        </tr>
       </thead>
       <tbody>
         <tr 
           v-for="vehiculo in inventarioFiltrado" 
-          :key="vehiculo.id" 
-          @click="verDetalle(vehiculo.id)"
+          :key="vehiculo.ID_Registro" 
+          @click="verDetalle(vehiculo.ID_Registro)"
         >
           <td>
             <img 
@@ -137,16 +155,24 @@ function getImageUrl(rutaOriginal) {
               class="vehiculo-imagen"
             >
           </td>
-          <td>{{ vehiculo.placa }}</td>
-          <td>{{ vehiculo.marca }}</td>
-          <td>{{ vehiculo.modelo }}</td>
-          <td>{{ vehiculo.anio }}</td>
-          <td>{{ formatFecha(vehiculo.fecha_ingreso) }}</td>
+          <td>{{ vehiculo.Placa }}</td>
+          <td>{{ vehiculo.Marca }}</td>
+          <td>{{ vehiculo.Modelo }}</td>
+          <td>{{ vehiculo.Anio }}</td>
+          <td>{{ formatFecha(vehiculo.FechaIngreso) }}</td>
           
           <td class="acciones-td">
             <button 
+                class="btn-liberar" 
+                @click.stop="liberarVehiculo(vehiculo.ID_Registro)"
+                title="Marcar como Liberado"
+                v-if="vehiculo.Estado !== 'Liberado'"
+            >
+                ✅
+            </button>
+            <button 
                 class="btn-trash" 
-                @click.stop="eliminarVehiculo(vehiculo.id)"
+                @click.stop="eliminarVehiculo(vehiculo.ID_Registro)"
                 title="Eliminar permanentemente"
             >
                 🗑️
@@ -164,6 +190,20 @@ function getImageUrl(rutaOriginal) {
 </template>
 
 <style scoped>
+.btn-liberar {
+    background-color: transparent;
+    border: 1px solid #2ecc71;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 5px 10px;
+    margin-right: 5px;
+    transition: all 0.2s;
+}
+.btn-liberar:hover {
+    background-color: #2ecc71;
+    color: white;
+}
 .inventario-view {
   animation: fadeIn 0.5s ease-in-out;
 }

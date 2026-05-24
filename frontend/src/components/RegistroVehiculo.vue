@@ -66,7 +66,7 @@ async function registrar() {
   const formData = new FormData();
 
   for (const key in vehiculo) {
-    formData.append(key, vehiculo[key]);
+    formData.append(key, vehiculo[key] || ''); 
   }
 
   for (const fotoObj of fotos.value) {
@@ -80,13 +80,18 @@ async function registrar() {
       }
     });
     
+    // Si Axios no brincó al catch, ¡fue un éxito total!
     console.log('Respuesta del servidor:', response.data);
-    alert('¡Vehículo registrado con éxito!');
-    
+    alert('¡Vehículo registrado y multado con éxito!');
+    resetForm(); // Limpiamos el formulario para el siguiente auto
 
   } catch (error) {
-    console.error('Error al registrar el vehículo:', error);
-    alert('Hubo un error al registrar el vehículo.');
+    // Si de verdad hay un error, mostramos qué fue en la consola para no adivinar
+    console.error('Error detallado de Axios:', error.response?.data || error.message);
+    
+    // Y un mensaje más amigable en la alerta
+    const mensajeError = error.response?.data?.message || 'Error al conectar con la base de datos.';
+    alert(`Ocurrió un problema: ${mensajeError}`);
   }
 }
 

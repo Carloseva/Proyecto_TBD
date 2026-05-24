@@ -9,6 +9,8 @@ const props = defineProps({
   }
 });
 
+const emit = defineEmits(['edicion-terminada']);
+
 const API_BASE_URL = 'http://localhost:3000';
 const vehiculo = ref(null);
 const fotosNuevas = ref([]);
@@ -34,13 +36,14 @@ async function guardarCambios() {
 
     const formData = new FormData();
 
-    formData.append('placa', vehiculo.value.placa);
-    formData.append('marca', vehiculo.value.marca);
-    formData.append('modelo', vehiculo.value.modelo);
-    formData.append('anio', vehiculo.value.anio);
-    formData.append('color', vehiculo.value.color);
-    formData.append('titulo', vehiculo.value.titulo);
-    formData.append('motivo', vehiculo.value.motivo);
+    // Empaquetamos enviando las variables en mayúscula de SQL Server
+    formData.append('placa', vehiculo.value.Placa || '');
+    formData.append('marca', vehiculo.value.Marca || '');
+    formData.append('modelo', vehiculo.value.Modelo || '');
+    formData.append('anio', vehiculo.value.Anio || '');
+    formData.append('color', vehiculo.value.Color || '');
+    formData.append('titulo', vehiculo.value.TipoDocumento || '');
+    formData.append('motivo', vehiculo.value.MotivoIngreso || '');
 
     formData.append('fotosActualesJson', JSON.stringify(vehiculo.value.fotos));
 
@@ -55,8 +58,10 @@ async function guardarCambios() {
     });
 
     mensaje.value = response.data.message;
-    onMounted();
     fotosNuevas.value = [];
+    setTimeout(() => {
+      emit('edicion-terminada');
+    }, 1000);
 
   } catch (error) {
     console.error("Error al guardar cambios:", error);
@@ -110,34 +115,34 @@ function getImageUrl(rutaOriginal) {
       
       <div class="campo">
         <label>Placa:</label>
-        <input type="text" v-model="vehiculo.placa">
+        <input type="text" v-model="vehiculo.Placa">
       </div>
       <div class="campo">
         <label>Marca:</label>
-        <input type="text" v-model="vehiculo.marca">
+        <input type="text" v-model="vehiculo.Marca">
       </div>
       <div class="campo">
         <label>Modelo:</label>
-        <input type="text" v-model="vehiculo.modelo">
+        <input type="text" v-model="vehiculo.Modelo">
       </div>
       <div class="campo">
         <label>Año:</label>
-        <input type="number" v-model.number="vehiculo.anio" min="1980" :max="anioActual + 1">
+        <input type="number" v-model.number="vehiculo.Anio" min="1980" :max="anioActual + 1">
       </div>
       <div class="campo">
         <label>Color:</label>
-        <input type="text" v-model="vehiculo.color">
+        <input type="text" v-model="vehiculo.Color">
       </div>
       <div class="campo">
         <label>Tipo de Título/Documento:</label>
-        <select v-model="vehiculo.titulo">
+        <select v-model="vehiculo.TipoDocumento">
           <option disabled value="">-- Selecciona una opción --</option>
           <option v-for="opcion in opcionesTitulo" :key="opcion" :value="opcion">{{ opcion }}</option>
         </select>
       </div>
       <div class="campo">
         <label>Motivo de Ingreso:</label>
-        <textarea rows="3" v-model="vehiculo.motivo"></textarea>
+        <textarea rows="3" v-model="vehiculo.MotivoIngreso"></textarea>
       </div>
 
       <div class="campo">
@@ -203,7 +208,7 @@ button {
   font-weight: bold; cursor: pointer; transition: background-color 0.3s;
 }
 button:hover { background-color: #36a374; }
-.mensaje-feedback { font-weight: bold; margin-top: 1rem; }
+.mensaje-feedback { font-weight: bold; margin-top: 1rem; color: #2ecc71; }
 
 .foto-preview-gallery {
   display: flex;

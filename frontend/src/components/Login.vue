@@ -19,31 +19,30 @@ const iniciarSesion = async () => {
   errorMensaje.value = '';
 
   try {
-    // Conectamos con la ruta de tu amigo en el server.js
+    // Apuntamos al endpoint que vamos a crear en tu server.js
     const res = await axios.post('http://localhost:3000/api/login', {
       username: username.value,
       password: password.value
     });
 
     if (res.data.success) {
-      // Si el server dice que sí, guardamos la "llave" y entramos
-      localStorage.setItem('esAdmin', 'true');
+      // Guardamos el rol que nos regrese SQL Server
+      localStorage.setItem('userRole', res.data.role);
       
-      // Forzamos la recarga para que el Sidebar se actualice
+      // Si el rol es admin, para compatibilidad con otras partes de tu código
+      if (res.data.role === 'Admin') {
+          localStorage.setItem('esAdmin', 'true');
+      }
+
+      // Redirigimos al inicio
       window.location.href = '/';
     }
   } catch (error) {
-    // Si el servidor marca error (ej. credenciales incorrectas)
     if (error.response && error.response.status === 401) {
       errorMensaje.value = '❌ Usuario o contraseña incorrectos.';
     } else {
-      // Fallback por si borraron la ruta del server.js accidentalmente
-      if (username.value === 'admin' && password.value === '123') {
-        localStorage.setItem('esAdmin', 'true');
-        window.location.href = '/';
-      } else {
-        errorMensaje.value = '❌ Usuario o contraseña incorrectos.';
-      }
+      errorMensaje.value = '❌ Error de conexión con el servidor.';
+      console.error(error);
     }
   } finally {
     cargando.value = false;
