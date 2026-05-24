@@ -63,6 +63,28 @@ app.get('/api/vehiculos', async (req, res) => {
     }
 });
 
+// OBTENER UN SOLO VEHÍCULO POR SU ID
+app.get('/api/vehiculos/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await poolPromise;
+        
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .query('SELECT * FROM vehiculos WHERE id = @id');
+
+        if (result.recordset.length > 0) {
+            const vehiculo = result.recordset[0];
+            vehiculo.fotos = vehiculo.fotos ? JSON.parse(vehiculo.fotos) : [];
+            res.json(vehiculo);
+        } else {
+            res.status(404).json({ message: 'Vehículo no encontrado' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ESTADÍSTICAS PARA EL DASHBOARD
 app.get('/api/stats', async (req, res) => {
     try {
@@ -96,11 +118,14 @@ app.post('/api/registrar-vehiculo', upload.array('fotos', 20), async (req, res) 
 
         const fotosPaths = req.files.map(file => file.path);
 
+        // 👇 CORRECCIÓN 2: Evitamos que un año vacío rompa SQL Server
+        const anioParseado = (anio === '' || anio === 'null') ? null : anio;
+
         await pool.request()
             .input('placa', sql.VarChar, placa)
             .input('marca', sql.VarChar, marca)
             .input('modelo', sql.VarChar, modelo)
-            .input('anio', sql.Int, anio)
+            .input('anio', sql.Int, anioParseado) 
             .input('color', sql.VarChar, color)
             .input('titulo', sql.VarChar, titulo)
             .input('motivo', sql.VarChar, motivo)
@@ -110,6 +135,25 @@ app.post('/api/registrar-vehiculo', upload.array('fotos', 20), async (req, res) 
                     VALUES (@placa, @marca, @modelo, @anio, @color, @titulo, @motivo, @fotos, @estatus, GETDATE())`);
 
         res.status(201).json({ success: true, message: 'Vehículo registrado sin duplicados.' });
+    } catch (err) {
+        console.error("💥 ERROR CRÍTICO AL REGISTRAR:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ACTUALIZAR ESTATUS (Liberación)
+app.patch('/api/vehiculos/:id/estatus', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { estatus } = req.body;
+        const pool = await poolPromise;
+
+        await pool.request()
+            .input('id', sql.Int, id)
+            .input('estatus', sql.VarChar, estatus)
+            .query('UPDATE vehiculos SET estatus = @estatus WHERE id = @id');
+
+        res.json({ success: true, message: 'Estatus actualizado correctamente.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
